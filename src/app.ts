@@ -3,7 +3,7 @@
  * Handles UI interactions, state management, and coordination between modules
  */
 
-import { Invoice, Client, createBlankInvoice, generateId } from './schema';
+import { Invoice, Client, Seller, createBlankInvoice, generateId } from './schema';
 import {
   initDB,
   saveInvoice,
@@ -61,6 +61,7 @@ async function init() {
     allInvoices = await getAllInvoices();
     populateInvoiceSelect();
     populateClientDatalist();
+    populateSellerDatalist();
 
     // Create new blank invoice or load last edited
     const lastInvoiceId = await getSetting<string>('lastInvoiceId');
@@ -133,6 +134,10 @@ function setupEventListeners() {
   // Client autocomplete
   document.getElementById('client-name')?.addEventListener('change', onClientNameChange);
   document.getElementById('client-name')?.addEventListener('blur', onClientNameChange);
+
+  // Seller autocomplete
+  document.getElementById('seller-name')?.addEventListener('change', onSellerNameChange);
+  document.getElementById('seller-name')?.addEventListener('blur', onSellerNameChange);
 
   // History view buttons
   document.getElementById('close-history')?.addEventListener('click', showEditorView);
@@ -469,6 +474,13 @@ function updateTotalsDisplay() {
 async function createNewInvoice() {
   const sequence = await getNextInvoiceSequence();
   currentInvoice = createBlankInvoice(sequence);
+
+  // Load last used seller information
+  const savedSeller = await getSetting('lastSeller');
+  if (savedSeller) {
+    currentInvoice.seller = savedSeller;
+  }
+
   renderInvoiceForm();
   updateTotalsDisplay();
   populateInvoiceSelect();
@@ -484,9 +496,13 @@ async function saveCurrentInvoice() {
     await saveInvoice(currentInvoice);
     await saveSetting('lastInvoiceId', currentInvoice.id);
 
+    // Save seller information for future invoices
+    await saveSetting('lastSeller', currentInvoice.seller);
+
     allInvoices = await getAllInvoices();
     populateInvoiceSelect();
     populateClientDatalist();
+    populateSellerDatalist();
 
     showToast('Invoice saved successfully', 'success');
   } catch (error) {
@@ -976,6 +992,58 @@ function onClientNameChange() {
   if (matchingClient) {
     setValue('client-address', matchingClient.address || '');
     setValue('client-email', matchingClient.email || '');
+    updateInvoiceFromForm();
+  }
+}
+
+function getUniqueSellers(): Seller[] {
+  const sellersMap = new Map<string, Seller>();
+
+  allInvoices.forEach((invoice) => {
+    if (invoice.seller.name) {
+      const key = invoice.seller.name.toLowerCase();
+      if (!sellersMap.has(key)) {
+        sellersMap.set(key, { ...invoice.seller });
+      }
+    }
+  });
+
+  return Array.from(sellersMap.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+}
+
+function populateSellerDatalist() {
+  const datalist = document.getElementById('seller-list');
+  if (!datalist) return;
+
+  datalist.innerHTML = '';
+  const sellers = getUniqueSellers();
+
+  sellers.forEach((seller) => {
+    const option = document.createElement('option');
+    option.value = seller.name;
+    datalist.appendChild(option);
+  });
+}
+
+function onSellerNameChange() {
+  const sellerNameInput = document.getElementById('seller-name') as HTMLInputElement;
+  if (!sellerNameInput) return;
+
+  const sellerName = sellerNameInput.value;
+  const sellers = getUniqueSellers();
+  const matchingSeller = sellers.find((s) => s.name === sellerName);
+
+  if (matchingSeller) {
+    setValue('seller-address', matchingSeller.address || '');
+    setValue('seller-email', matchingSeller.email || '');
+    setValue('seller-phone', matchingSeller.phone || '');
+    setValue('seller-website', matchingSeller.website || '');
+    if (currentInvoice) {
+      currentInvoice.seller = { ...matchingSeller };
+      updateLogoPreview();
+    }
     updateInvoiceFromForm();
   }
 }
