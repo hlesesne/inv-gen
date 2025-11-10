@@ -15,8 +15,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
 
   <!-- Styles -->
-  <script type="module" crossorigin src="/inv-gen/assets/index-BAoVZkvq.js"></script>
-  <link rel="stylesheet" crossorigin href="/inv-gen/assets/index-BadYITmB.css">
+  <script type="module" crossorigin src="/inv-gen/assets/index-Dr5r_t3Y.js"></script>
+  <link rel="stylesheet" crossorigin href="/inv-gen/assets/index-epLp0nqk.css">
 </head>
 <body>
   <!-- App Container -->
@@ -323,6 +323,12 @@
           <div class="history-header">
             <h2>Invoice History</h2>
             <div class="history-actions">
+              <button id="view-analytics" class="btn btn-sm btn-primary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                <span>Analytics</span>
+              </button>
               <button id="export-data" class="btn btn-sm btn-secondary">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
@@ -365,6 +371,59 @@
           <!-- Invoice List -->
           <div id="history-list" class="history-list">
             <!-- Invoices will be listed dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Analytics Dashboard View -->
+      <div id="analytics-view" class="view">
+        <div class="history-container">
+          <div class="history-header">
+            <h2>Analytics Dashboard</h2>
+            <div class="history-actions">
+              <button id="close-analytics" class="btn btn-sm btn-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                <span>Back to History</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Key Metrics -->
+          <div id="analytics-metrics" class="history-summary mb-6">
+            <!-- Metrics will be populated dynamically -->
+          </div>
+
+          <!-- Charts Grid -->
+          <div class="analytics-charts-grid">
+            <!-- Revenue Trend -->
+            <div class="chart-card">
+              <h3 class="chart-title">Revenue Trends</h3>
+              <canvas id="revenue-chart"></canvas>
+            </div>
+
+            <!-- Invoice Status -->
+            <div class="chart-card">
+              <h3 class="chart-title">Invoice Status Breakdown</h3>
+              <canvas id="status-chart"></canvas>
+            </div>
+
+            <!-- Top Clients -->
+            <div class="chart-card chart-card-wide">
+              <h3 class="chart-title">Top 10 Clients by Revenue</h3>
+              <canvas id="clients-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Aging Report -->
+          <div class="form-section mt-6">
+            <div class="section-header">
+              <h2>Accounts Receivable Aging Report</h2>
+            </div>
+            <div id="aging-report" class="overflow-x-auto">
+              <!-- Aging table will be populated dynamically -->
+            </div>
           </div>
         </div>
       </div>
