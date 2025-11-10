@@ -288,7 +288,7 @@ export async function generatePDF(invoice: Invoice): Promise<void> {
   // Wait for content to render
   await new Promise(resolve => setTimeout(resolve, 100));
 
-  const container = iframeDoc.querySelector('.invoice-container');
+  const container = iframeDoc.querySelector('.invoice-container') as HTMLElement;
   if (!container) {
     document.body.removeChild(iframe);
     throw new Error('Invoice container not found');
@@ -333,7 +333,7 @@ export async function generatePDFBlob(invoice: Invoice): Promise<Blob> {
   // Wait for content to render
   await new Promise(resolve => setTimeout(resolve, 100));
 
-  const container = iframeDoc.querySelector('.invoice-container');
+  const container = iframeDoc.querySelector('.invoice-container') as HTMLElement;
   if (!container) {
     document.body.removeChild(iframe);
     throw new Error('Invoice container not found');
