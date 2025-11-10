@@ -3,7 +3,7 @@
  * Handles UI interactions, state management, and coordination between modules
  */
 
-import { Invoice, createBlankInvoice, generateId } from './schema';
+import { Invoice, Client, createBlankInvoice, generateId } from './schema';
 import {
   initDB,
   saveInvoice,
@@ -60,6 +60,7 @@ async function init() {
     // Load all invoices
     allInvoices = await getAllInvoices();
     populateInvoiceSelect();
+    populateClientDatalist();
 
     // Create new blank invoice or load last edited
     const lastInvoiceId = await getSetting<string>('lastInvoiceId');
@@ -121,10 +122,17 @@ function setupEventListeners() {
 
   // Logo upload
   document.getElementById('seller-logo')?.addEventListener('change', onLogoUpload);
+  document.getElementById('change-logo')?.addEventListener('click', () => {
+    document.getElementById('seller-logo')?.click();
+  });
 
   // Add item/payment buttons
   document.getElementById('add-item')?.addEventListener('click', addLineItem);
   document.getElementById('add-payment')?.addEventListener('click', addPayment);
+
+  // Client autocomplete
+  document.getElementById('client-name')?.addEventListener('change', onClientNameChange);
+  document.getElementById('client-name')?.addEventListener('blur', onClientNameChange);
 
   // History view buttons
   document.getElementById('close-history')?.addEventListener('click', showEditorView);
@@ -180,6 +188,9 @@ function renderInvoiceForm() {
 
   // Render payments
   renderPayments();
+
+  // Update logo preview
+  updateLogoPreview();
 }
 
 function updateInvoiceFromForm() {
@@ -475,6 +486,7 @@ async function saveCurrentInvoice() {
 
     allInvoices = await getAllInvoices();
     populateInvoiceSelect();
+    populateClientDatalist();
 
     showToast('Invoice saved successfully', 'success');
   } catch (error) {
@@ -515,6 +527,14 @@ async function downloadPDF() {
   try {
     showLoading(true);
     updateInvoiceFromForm();
+
+    // Auto-change draft invoices to sent when downloading PDF
+    if (currentInvoice.status === 'draft') {
+      currentInvoice.status = 'sent';
+      setValue('invoice-status', 'sent');
+      await saveInvoice(currentInvoice);
+    }
+
     await generatePDF(currentInvoice);
     showToast('PDF downloaded', 'success');
   } catch (error) {
@@ -599,6 +619,7 @@ async function onLogoUpload(event: Event) {
     reader.onload = (e) => {
       if (currentInvoice && e.target?.result) {
         currentInvoice.seller.logoDataUrl = e.target.result as string;
+        updateLogoPreview();
         showToast('Logo uploaded', 'success');
       }
     };
@@ -606,6 +627,23 @@ async function onLogoUpload(event: Event) {
   } catch (error) {
     console.error('Logo upload error:', error);
     showToast('Failed to upload logo', 'error');
+  }
+}
+
+function updateLogoPreview() {
+  const previewContainer = document.getElementById('logo-preview-container');
+  const previewImg = document.getElementById('logo-preview') as HTMLImageElement;
+  const logoInput = document.getElementById('seller-logo') as HTMLInputElement;
+
+  if (!previewContainer || !previewImg || !logoInput) return;
+
+  if (currentInvoice?.seller.logoDataUrl) {
+    previewImg.src = currentInvoice.seller.logoDataUrl;
+    previewContainer.classList.remove('hidden');
+    logoInput.classList.add('hidden');
+  } else {
+    previewContainer.classList.add('hidden');
+    logoInput.classList.remove('hidden');
   }
 }
 
@@ -887,6 +925,58 @@ function handleKeyboardShortcuts(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key === 'n') {
     event.preventDefault();
     createNewInvoice();
+  }
+}
+
+// ========================================
+// Client/Seller Autocomplete
+// ========================================
+
+function getUniqueClients(): Client[] {
+  const clientsMap = new Map<string, Client>();
+
+  allInvoices.forEach((invoice) => {
+    if (invoice.client.name) {
+      const key = invoice.client.name.toLowerCase();
+      if (!clientsMap.has(key)) {
+        clientsMap.set(key, { ...invoice.client });
+      }
+    }
+  });
+
+  return Array.from(clientsMap.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+}
+
+function populateClientDatalist() {
+  const datalist = document.getElementById('client-list');
+  if (!datalist) return;
+
+  datalist.innerHTML = '';
+  const clients = getUniqueClients();
+
+  clients.forEach((client) => {
+    const option = document.createElement('option');
+    option.value = client.name;
+    option.setAttribute('data-address', client.address || '');
+    option.setAttribute('data-email', client.email || '');
+    datalist.appendChild(option);
+  });
+}
+
+function onClientNameChange() {
+  const clientNameInput = document.getElementById('client-name') as HTMLInputElement;
+  if (!clientNameInput) return;
+
+  const clientName = clientNameInput.value;
+  const clients = getUniqueClients();
+  const matchingClient = clients.find((c) => c.name === clientName);
+
+  if (matchingClient) {
+    setValue('client-address', matchingClient.address || '');
+    setValue('client-email', matchingClient.email || '');
+    updateInvoiceFromForm();
   }
 }
 
