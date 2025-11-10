@@ -1,0 +1,30 @@
+{
+  "name": "invoice-generator",
+  "version": "1.0.0",
+  "description": "A 100% client-side invoice generator with offline support",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && gh-pages -d dist"
+  },
+  "keywords": [
+    "invoice",
+    "generator",
+    "pwa",
+    "offline",
+    "client-side"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11",
+    "gh-pages": "^6.1.1"
+  },
+  "dependencies": {
+    "html2pdf.js": "^0.10.1",
+    "idb": "^8.0.0"
+  }
+}

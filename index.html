@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Free, offline-capable invoice generator. Create professional invoices entirely in your browser with no data sent to servers.">
+  <meta name="theme-color" content="#3B82F6">
+  <title>Invoice Generator - Free Offline Invoice Creator</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
+  <!-- Preconnect for performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+  <!-- App Container -->
+  <div id="app" class="app">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-content">
+        <div class="header-left">
+          <h1 class="app-title">Invoice Generator</h1>
+          <span class="app-badge">Offline</span>
+        </div>
+        <div class="header-right">
+          <button id="theme-toggle" class="btn btn-icon" aria-label="Toggle theme" title="Toggle dark mode">
+            <span class="icon">🌙</span>
+          </button>
+          <button id="view-history" class="btn btn-secondary">
+            <span class="icon">📋</span>
+            <span>History</span>
+          </button>
+          <button id="new-invoice" class="btn btn-primary">
+            <span class="icon">➕</span>
+            <span>New Invoice</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="app-main">
+      <!-- Editor View -->
+      <div id="editor-view" class="view active">
+        <div class="editor-container">
+          <!-- Toolbar -->
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <select id="invoice-select" class="form-select" aria-label="Select invoice">
+                <option value="">New Invoice</option>
+              </select>
+              <button id="save-invoice" class="btn btn-sm btn-success" title="Save (Ctrl+S)">
+                <span class="icon">💾</span>
+                <span>Save</span>
+              </button>
+              <button id="duplicate-invoice" class="btn btn-sm btn-secondary" title="Duplicate">
+                <span class="icon">📄</span>
+                <span>Duplicate</span>
+              </button>
+            </div>
+            <div class="toolbar-right">
+              <button id="download-pdf" class="btn btn-sm btn-primary" title="Download PDF">
+                <span class="icon">📥</span>
+                <span>Download PDF</span>
+              </button>
+              <button id="print-invoice" class="btn btn-sm btn-secondary" title="Print (Ctrl+P)">
+                <span class="icon">🖨️</span>
+                <span>Print</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Invoice Form -->
+          <div class="invoice-form">
+            <!-- Header Section -->
+            <section class="form-section">
+              <div class="section-header">
+                <h2>Invoice Details</h2>
+              </div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="invoice-number">Invoice Number</label>
+                  <input type="text" id="invoice-number" class="form-input" required>
+                </div>
+                <div class="form-group">
+                  <label for="invoice-status">Status</label>
+                  <select id="invoice-status" class="form-select">
+                    <option value="draft">Draft</option>
+                    <option value="sent">Sent</option>
+                    <option value="paid">Paid</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="issue-date">Issue Date</label>
+                  <input type="date" id="issue-date" class="form-input" required>
+                </div>
+                <div class="form-group">
+                  <label for="due-date">Due Date</label>
+                  <input type="date" id="due-date" class="form-input" required>
+                </div>
+                <div class="form-group">
+                  <label for="currency">Currency</label>
+                  <select id="currency" class="form-select">
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                    <option value="JPY">JPY (¥)</option>
+                    <option value="CAD">CAD (CA$)</option>
+                    <option value="AUD">AUD (A$)</option>
+                    <option value="CHF">CHF</option>
+                    <option value="CNY">CNY (¥)</option>
+                    <option value="INR">INR (₹)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="theme-color">Theme Color</label>
+                  <input type="color" id="theme-color" class="form-input" value="#3B82F6">
+                </div>
+              </div>
+            </section>
+
+            <!-- Seller Section -->
+            <section class="form-section">
+              <div class="section-header">
+                <h2>From (Your Business)</h2>
+              </div>
+              <div class="form-grid">
+                <div class="form-group full-width">
+                  <label for="seller-name">Business Name</label>
+                  <input type="text" id="seller-name" class="form-input" placeholder="Your Business Name" required>
+                </div>
+                <div class="form-group full-width">
+                  <label for="seller-address">Address</label>
+                  <textarea id="seller-address" class="form-textarea" rows="3" placeholder="Street Address&#10;City, State ZIP&#10;Country"></textarea>
+                </div>
+                <div class="form-group">
+                  <label for="seller-email">Email</label>
+                  <input type="email" id="seller-email" class="form-input" placeholder="contact@business.com">
+                </div>
+                <div class="form-group">
+                  <label for="seller-phone">Phone</label>
+                  <input type="tel" id="seller-phone" class="form-input" placeholder="+1 (555) 123-4567">
+                </div>
+                <div class="form-group">
+                  <label for="seller-website">Website</label>
+                  <input type="url" id="seller-website" class="form-input" placeholder="https://business.com">
+                </div>
+                <div class="form-group">
+                  <label for="seller-logo">Logo (optional)</label>
+                  <input type="file" id="seller-logo" class="form-input" accept="image/*">
+                </div>
+              </div>
+            </section>
+
+            <!-- Client Section -->
+            <section class="form-section">
+              <div class="section-header">
+                <h2>Bill To (Client)</h2>
+              </div>
+              <div class="form-grid">
+                <div class="form-group full-width">
+                  <label for="client-name">Client Name</label>
+                  <input type="text" id="client-name" class="form-input" placeholder="Client or Company Name" required>
+                </div>
+                <div class="form-group full-width">
+                  <label for="client-address">Address</label>
+                  <textarea id="client-address" class="form-textarea" rows="3" placeholder="Street Address&#10;City, State ZIP&#10;Country"></textarea>
+                </div>
+                <div class="form-group">
+                  <label for="client-email">Email</label>
+                  <input type="email" id="client-email" class="form-input" placeholder="client@email.com">
+                </div>
+              </div>
+            </section>
+
+            <!-- Line Items Section -->
+            <section class="form-section">
+              <div class="section-header">
+                <h2>Line Items</h2>
+                <button id="add-item" class="btn btn-sm btn-primary">
+                  <span class="icon">➕</span>
+                  <span>Add Item</span>
+                </button>
+              </div>
+              <div id="items-container" class="items-container">
+                <!-- Items will be added dynamically -->
+              </div>
+            </section>
+
+            <!-- Adjustments Section -->
+            <section class="form-section">
+              <div class="section-header">
+                <h2>Adjustments & Totals</h2>
+              </div>
+              <div class="adjustments-grid">
+                <div class="form-group">
+                  <label for="shipping">Shipping</label>
+                  <input type="number" id="shipping" class="form-input" step="0.01" min="0" value="0">
+                </div>
+                <div class="form-group">
+                  <label for="global-discount">Discount (%)</label>
+                  <input type="number" id="global-discount" class="form-input" step="0.01" min="0" max="100" value="0">
+                </div>
+                <div class="form-group">
+                  <label for="global-tax">Tax (%)</label>
+                  <input type="number" id="global-tax" class="form-input" step="0.01" min="0" max="100" value="0">
+                </div>
+              </div>
+
+              <!-- Totals Display -->
+              <div class="totals-summary">
+                <div class="total-row">
+                  <span>Subtotal:</span>
+                  <span id="total-subtotal">$0.00</span>
+                </div>
+                <div class="total-row">
+                  <span>Discount:</span>
+                  <span id="total-discount" class="text-success">$0.00</span>
+                </div>
+                <div class="total-row">
+                  <span>Tax:</span>
+                  <span id="total-tax">$0.00</span>
+                </div>
+                <div class="total-row total-grand">
+                  <span>Grand Total:</span>
+                  <span id="total-grand">$0.00</span>
+                </div>
+                <div class="total-row">
+                  <span>Amount Paid:</span>
+                  <span id="total-paid" class="text-success">$0.00</span>
+                </div>
+                <div class="total-row total-balance">
+                  <span>Balance Due:</span>
+                  <span id="total-balance">$0.00</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- Payments Section -->
+            <section class="form-section">
+              <div class="section-header">
+                <h2>Payments</h2>
+                <button id="add-payment" class="btn btn-sm btn-success">
+                  <span class="icon">💰</span>
+                  <span>Add Payment</span>
+                </button>
+              </div>
+              <div id="payments-container" class="payments-container">
+                <!-- Payments will be added dynamically -->
+              </div>
+            </section>
+
+            <!-- Notes Section -->
+            <section class="form-section">
+              <div class="section-header">
+                <h2>Additional Information</h2>
+              </div>
+              <div class="form-grid">
+                <div class="form-group full-width">
+                  <label for="notes">Notes</label>
+                  <textarea id="notes" class="form-textarea" rows="3" placeholder="Additional notes or comments for the client"></textarea>
+                </div>
+                <div class="form-group full-width">
+                  <label for="terms">Terms & Conditions</label>
+                  <textarea id="terms" class="form-textarea" rows="3" placeholder="Payment terms, late fees, etc."></textarea>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- History View -->
+      <div id="history-view" class="view">
+        <div class="history-container">
+          <div class="history-header">
+            <h2>Invoice History</h2>
+            <div class="history-actions">
+              <button id="export-data" class="btn btn-sm btn-secondary">
+                <span class="icon">📤</span>
+                <span>Export</span>
+              </button>
+              <button id="import-data" class="btn btn-sm btn-secondary">
+                <span class="icon">📥</span>
+                <span>Import</span>
+              </button>
+              <button id="close-history" class="btn btn-sm btn-secondary">
+                <span class="icon">✖️</span>
+                <span>Close</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="history-filters">
+            <input type="text" id="search-invoices" class="form-input" placeholder="Search invoices...">
+            <select id="filter-status" class="form-select">
+              <option value="">All Statuses</option>
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="paid">Paid</option>
+              <option value="overdue">Overdue</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+
+          <!-- Summary -->
+          <div id="history-summary" class="history-summary">
+            <!-- Summary will be populated dynamically -->
+          </div>
+
+          <!-- Invoice List -->
+          <div id="history-list" class="history-list">
+            <!-- Invoices will be listed dynamically -->
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>
+        <strong>Invoice Generator</strong> - 100% client-side, offline-capable invoice generator.
+        Your data never leaves your device.
+        <a href="https://github.com" target="_blank" rel="noopener">View on GitHub</a>
+      </p>
+    </footer>
+  </div>
+
+  <!-- Toast Notifications -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Loading Indicator -->
+  <div id="loading" class="loading hidden">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Script -->
+  <script type="module" src="/src/app.ts"></script>
+</body>
+</html>
