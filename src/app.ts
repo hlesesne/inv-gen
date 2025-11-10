@@ -53,7 +53,7 @@ async function init() {
     const savedTheme = await getSetting<string>('theme');
     if (savedTheme === 'dark') {
       currentTheme = 'dark';
-      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.classList.add('dark');
       updateThemeToggleIcon();
     }
 
@@ -62,6 +62,7 @@ async function init() {
     populateInvoiceSelect();
     populateClientDatalist();
     populateSellerDatalist();
+    populateItemsDatalist();
 
     // Create new blank invoice or load last edited
     const lastInvoiceId = await getSetting<string>('lastInvoiceId');
@@ -105,6 +106,7 @@ function setupEventListeners() {
 
   // Toolbar buttons
   document.getElementById('save-invoice')?.addEventListener('click', saveCurrentInvoice);
+  document.getElementById('save-invoice-bottom')?.addEventListener('click', saveCurrentInvoice);
   document.getElementById('duplicate-invoice')?.addEventListener('click', duplicateCurrentInvoice);
   document.getElementById('download-pdf')?.addEventListener('click', downloadPDF);
   document.getElementById('print-invoice')?.addEventListener('click', printCurrentInvoice);
@@ -258,7 +260,7 @@ function createLineItemRow(item: any, index: number) {
   row.innerHTML = `
     <div class="form-group">
       <label>Description</label>
-      <input type="text" class="form-input" data-item-index="${index}" data-field="description" value="${item.description || ''}">
+      <input type="text" class="form-input" data-item-index="${index}" data-field="description" value="${item.description || ''}" list="items-list">
     </div>
     <div class="form-group">
       <label>Quantity</label>
@@ -283,8 +285,18 @@ function createLineItemRow(item: any, index: number) {
 
   // Add event listeners
   row.querySelectorAll('input').forEach((input) => {
+    const field = input.dataset.field!;
+
+    // Special handling for description field to trigger autocomplete
+    if (field === 'description') {
+      input.addEventListener('change', () => {
+        onItemDescriptionChange(index, input as HTMLInputElement);
+      });
+    }
+
+    // Regular input handling for all fields
     input.addEventListener('input', debounce(() => {
-      onLineItemChange(index, input.dataset.field!, input.value);
+      onLineItemChange(index, field, input.value);
     }, 300));
   });
 
@@ -418,6 +430,12 @@ function addPayment() {
   renderPayments();
   currentInvoice.totals = calculateInvoiceTotals(currentInvoice);
   updateTotalsDisplay();
+
+  // Auto-mark as paid if balance is zero
+  if (currentInvoice.totals.balanceDue === 0 && currentInvoice.totals.grandTotal > 0) {
+    currentInvoice.status = 'paid';
+    setValue('invoice-status', 'paid');
+  }
 }
 
 function onPaymentChange(index: number, field: string, value: string) {
@@ -439,6 +457,12 @@ function onPaymentChange(index: number, field: string, value: string) {
 
   currentInvoice.totals = calculateInvoiceTotals(currentInvoice);
   updateTotalsDisplay();
+
+  // Auto-mark as paid if balance is zero
+  if (currentInvoice.totals.balanceDue === 0 && currentInvoice.totals.grandTotal > 0) {
+    currentInvoice.status = 'paid';
+    setValue('invoice-status', 'paid');
+  }
 }
 
 function removePayment(index: number) {
@@ -448,6 +472,16 @@ function removePayment(index: number) {
   renderPayments();
   currentInvoice.totals = calculateInvoiceTotals(currentInvoice);
   updateTotalsDisplay();
+
+  // Auto-mark as paid if balance is zero, or revert to sent/draft if balance > 0
+  if (currentInvoice.totals.balanceDue === 0 && currentInvoice.totals.grandTotal > 0) {
+    currentInvoice.status = 'paid';
+    setValue('invoice-status', 'paid');
+  } else if (currentInvoice.status === 'paid' && currentInvoice.totals.balanceDue > 0) {
+    // Revert from paid if balance is now due
+    currentInvoice.status = 'sent';
+    setValue('invoice-status', 'sent');
+  }
 }
 
 // ========================================
@@ -503,6 +537,7 @@ async function saveCurrentInvoice() {
     populateInvoiceSelect();
     populateClientDatalist();
     populateSellerDatalist();
+    populateItemsDatalist();
 
     showToast('Invoice saved successfully', 'success');
   } catch (error) {
@@ -781,26 +816,43 @@ function createInvoiceCard(invoice: Invoice) {
       </div>
     </div>
     <div class="invoice-card-actions">
+      ${invoice.totals.balanceDue > 0 ? `
+      <button class="btn btn-sm btn-success" data-action="mark-paid" data-id="${invoice.id}">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span>Mark Paid</span>
+      </button>
+      ` : ''}
       <button class="btn btn-sm btn-primary" data-action="edit" data-id="${invoice.id}">
-        <span class="icon">✏️</span>
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        </svg>
         <span>Edit</span>
       </button>
       <button class="btn btn-sm btn-secondary" data-action="duplicate" data-id="${invoice.id}">
-        <span class="icon">📄</span>
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
         <span>Duplicate</span>
       </button>
       <button class="btn btn-sm btn-secondary" data-action="pdf" data-id="${invoice.id}">
-        <span class="icon">📥</span>
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
         <span>PDF</span>
       </button>
       <button class="btn btn-sm btn-danger" data-action="delete" data-id="${invoice.id}">
-        <span class="icon">🗑️</span>
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
         <span>Delete</span>
       </button>
     </div>
   `;
 
   // Add event listeners
+  card.querySelector('[data-action="mark-paid"]')?.addEventListener('click', () => markInvoiceAsPaid(invoice.id));
   card.querySelector('[data-action="edit"]')?.addEventListener('click', () => editInvoice(invoice.id));
   card.querySelector('[data-action="duplicate"]')?.addEventListener('click', () => duplicateInvoice(invoice.id));
   card.querySelector('[data-action="pdf"]')?.addEventListener('click', () => downloadInvoicePDF(invoice.id));
@@ -847,6 +899,35 @@ async function downloadInvoicePDF(id: string) {
   } catch (error) {
     console.error('PDF error:', error);
     showToast('Failed to generate PDF', 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function markInvoiceAsPaid(id: string) {
+  try {
+    showLoading(true);
+    const invoice = await getInvoice(id);
+    if (!invoice) return;
+
+    // Add payment for the full balance due
+    const payment = {
+      id: generateId(),
+      date: new Date().toISOString().split('T')[0],
+      amount: invoice.totals.balanceDue,
+      note: 'Marked as paid from history',
+    };
+
+    invoice.payments.push(payment);
+    invoice.totals = calculateInvoiceTotals(invoice);
+    invoice.status = 'paid';
+
+    await saveInvoice(invoice);
+    showToast('Invoice marked as paid', 'success');
+    renderHistoryView();
+  } catch (error) {
+    console.error('Mark paid error:', error);
+    showToast('Failed to mark invoice as paid', 'error');
   } finally {
     showLoading(false);
   }
@@ -908,7 +989,11 @@ async function importAllData() {
 
 async function toggleTheme() {
   currentTheme = currentTheme === 'light' ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', currentTheme);
+  if (currentTheme === 'dark') {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
   await saveSetting('theme', currentTheme);
   updateThemeToggleIcon();
 }
@@ -1045,6 +1130,90 @@ function onSellerNameChange() {
       updateLogoPreview();
     }
     updateInvoiceFromForm();
+  }
+}
+
+// ========================================
+// Line Items Autocomplete
+// ========================================
+
+interface SavedLineItem {
+  description: string;
+  unitPrice: number;
+  discountPct?: number;
+  taxRatePct?: number;
+}
+
+function getUniqueLineItems(): SavedLineItem[] {
+  const itemsMap = new Map<string, SavedLineItem>();
+
+  allInvoices.forEach((invoice) => {
+    invoice.items.forEach((item) => {
+      if (item.description && item.description.trim()) {
+        const key = item.description.toLowerCase().trim();
+        // Store the most recent pricing for this item
+        if (!itemsMap.has(key) || itemsMap.get(key)!.unitPrice < item.unitPrice) {
+          itemsMap.set(key, {
+            description: item.description.trim(),
+            unitPrice: item.unitPrice,
+            discountPct: item.discountPct,
+            taxRatePct: item.taxRatePct,
+          });
+        }
+      }
+    });
+  });
+
+  return Array.from(itemsMap.values()).sort((a, b) =>
+    a.description.localeCompare(b.description)
+  );
+}
+
+function populateItemsDatalist() {
+  const items = getUniqueLineItems();
+  const datalistId = 'items-list';
+
+  // Remove existing datalist if it exists
+  const existingDatalist = document.getElementById(datalistId);
+  if (existingDatalist) {
+    existingDatalist.remove();
+  }
+
+  // Create new datalist
+  const datalist = document.createElement('datalist');
+  datalist.id = datalistId;
+
+  items.forEach((item) => {
+    const option = document.createElement('option');
+    option.value = item.description;
+    option.textContent = `${item.description} - $${item.unitPrice.toFixed(2)}`;
+    datalist.appendChild(option);
+  });
+
+  document.body.appendChild(datalist);
+}
+
+function onItemDescriptionChange(index: number, descriptionInput: HTMLInputElement) {
+  if (!currentInvoice) return;
+
+  const description = descriptionInput.value;
+  const items = getUniqueLineItems();
+  const matchingItem = items.find((item) => item.description === description);
+
+  if (matchingItem && currentInvoice.items[index]) {
+    // Auto-fill the price and other fields
+    currentInvoice.items[index].unitPrice = matchingItem.unitPrice;
+    if (matchingItem.discountPct !== undefined) {
+      currentInvoice.items[index].discountPct = matchingItem.discountPct;
+    }
+    if (matchingItem.taxRatePct !== undefined) {
+      currentInvoice.items[index].taxRatePct = matchingItem.taxRatePct;
+    }
+
+    // Re-render to show the updated values
+    renderLineItems();
+    currentInvoice.totals = calculateInvoiceTotals(currentInvoice);
+    updateTotalsDisplay();
   }
 }
 
