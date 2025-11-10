@@ -267,12 +267,32 @@ function getStatusColor(status: string): string {
 export async function generatePDF(invoice: Invoice): Promise<void> {
   const html = generateInvoiceHTML(invoice);
 
-  // Create a temporary container
-  const container = document.createElement('div');
-  container.innerHTML = html;
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  document.body.appendChild(container);
+  // Create a temporary iframe to properly render the full HTML document
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'absolute';
+  iframe.style.left = '-9999px';
+  iframe.style.width = '800px';
+  iframe.style.height = '1200px';
+  document.body.appendChild(iframe);
+
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!iframeDoc) {
+    document.body.removeChild(iframe);
+    throw new Error('Could not access iframe document');
+  }
+
+  iframeDoc.open();
+  iframeDoc.write(html);
+  iframeDoc.close();
+
+  // Wait for content to render
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  const container = iframeDoc.querySelector('.invoice-container');
+  if (!container) {
+    document.body.removeChild(iframe);
+    throw new Error('Invoice container not found');
+  }
 
   const options = getPdfOptions(invoice.theme.pageSize);
   options.filename = `invoice-${invoice.number}.pdf`;
@@ -280,7 +300,7 @@ export async function generatePDF(invoice: Invoice): Promise<void> {
   try {
     await html2pdf().set(options).from(container).save();
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(iframe);
   }
 }
 
@@ -292,11 +312,32 @@ export async function generatePDF(invoice: Invoice): Promise<void> {
 export async function generatePDFBlob(invoice: Invoice): Promise<Blob> {
   const html = generateInvoiceHTML(invoice);
 
-  const container = document.createElement('div');
-  container.innerHTML = html;
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  document.body.appendChild(container);
+  // Create a temporary iframe to properly render the full HTML document
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'absolute';
+  iframe.style.left = '-9999px';
+  iframe.style.width = '800px';
+  iframe.style.height = '1200px';
+  document.body.appendChild(iframe);
+
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!iframeDoc) {
+    document.body.removeChild(iframe);
+    throw new Error('Could not access iframe document');
+  }
+
+  iframeDoc.open();
+  iframeDoc.write(html);
+  iframeDoc.close();
+
+  // Wait for content to render
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  const container = iframeDoc.querySelector('.invoice-container');
+  if (!container) {
+    document.body.removeChild(iframe);
+    throw new Error('Invoice container not found');
+  }
 
   const options = getPdfOptions(invoice.theme.pageSize);
 
@@ -304,7 +345,7 @@ export async function generatePDFBlob(invoice: Invoice): Promise<Blob> {
     const pdf = await html2pdf().set(options).from(container).outputPdf('blob');
     return pdf;
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(iframe);
   }
 }
 
