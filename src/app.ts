@@ -29,6 +29,10 @@ import {
   isInvoiceOverdue,
 } from './utils';
 import { generatePDF, printInvoice } from './pdf';
+import { Chart, registerables } from 'chart.js';
+
+// Register Chart.js components
+Chart.register(...registerables);
 
 // ========================================
 // State Management
@@ -145,6 +149,10 @@ function setupEventListeners() {
   document.getElementById('close-history')?.addEventListener('click', showEditorView);
   document.getElementById('export-data')?.addEventListener('click', exportAllData);
   document.getElementById('import-data')?.addEventListener('click', importAllData);
+  document.getElementById('view-analytics')?.addEventListener('click', showAnalyticsView);
+
+  // Analytics view buttons
+  document.getElementById('close-analytics')?.addEventListener('click', showHistoryView);
 
   // History filters
   document.getElementById('search-invoices')?.addEventListener('input', debounce(renderHistoryView, 300));
@@ -984,6 +992,369 @@ async function importAllData() {
 }
 
 // ========================================
+// Analytics Dashboard
+// ========================================
+
+let revenueChart: Chart | null = null;
+let statusChart: Chart | null = null;
+let clientsChart: Chart | null = null;
+
+function showAnalyticsView() {
+  document.getElementById('history-view')?.classList.remove('active');
+  document.getElementById('analytics-view')?.classList.add('active');
+  renderAnalytics();
+}
+
+async function renderAnalytics() {
+  try {
+    showLoading(true);
+    const invoices = await getAllInvoices();
+
+    // Render metrics
+    renderAnalyticsMetrics(invoices);
+
+    // Render charts
+    renderRevenueChart(invoices);
+    renderStatusChart(invoices);
+    renderClientsChart(invoices);
+
+    // Render aging report
+    renderAgingReport(invoices);
+  } catch (error) {
+    console.error('Analytics error:', error);
+    showToast('Failed to load analytics', 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+function renderAnalyticsMetrics(invoices: Invoice[]) {
+  const container = document.getElementById('analytics-metrics');
+  if (!container) return;
+
+  const totalRevenue = invoices.reduce((sum, inv) => sum + inv.totals.grandTotal, 0);
+  const totalPaid = invoices.reduce((sum, inv) => sum + inv.totals.amountPaid, 0);
+  const totalOutstanding = invoices.reduce((sum, inv) => sum + inv.totals.balanceDue, 0);
+  const avgInvoiceValue = invoices.length > 0 ? totalRevenue / invoices.length : 0;
+
+  container.innerHTML = `
+    <div class="summary-card">
+      <h3>Total Revenue</h3>
+      <div class="value">${formatCurrency(totalRevenue, 'USD')}</div>
+    </div>
+    <div class="summary-card">
+      <h3>Total Paid</h3>
+      <div class="value text-success">${formatCurrency(totalPaid, 'USD')}</div>
+    </div>
+    <div class="summary-card">
+      <h3>Outstanding</h3>
+      <div class="value text-danger">${formatCurrency(totalOutstanding, 'USD')}</div>
+    </div>
+    <div class="summary-card">
+      <h3>Avg Invoice Value</h3>
+      <div class="value">${formatCurrency(avgInvoiceValue, 'USD')}</div>
+    </div>
+  `;
+}
+
+function renderRevenueChart(invoices: Invoice[]) {
+  const canvas = document.getElementById('revenue-chart') as HTMLCanvasElement;
+  if (!canvas) return;
+
+  // Destroy existing chart
+  if (revenueChart) {
+    revenueChart.destroy();
+  }
+
+  // Group invoices by month
+  const monthlyData = new Map<string, number>();
+
+  invoices.forEach((invoice) => {
+    const date = new Date(invoice.issueDate);
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const current = monthlyData.get(monthKey) || 0;
+    monthlyData.set(monthKey, current + invoice.totals.grandTotal);
+  });
+
+  // Sort by month and get last 12 months
+  const sortedMonths = Array.from(monthlyData.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-12);
+
+  const labels = sortedMonths.map(([month]) => {
+    const [year, monthNum] = month.split('-');
+    const date = new Date(parseInt(year), parseInt(monthNum) - 1);
+    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  });
+
+  const data = sortedMonths.map(([, total]) => total);
+
+  const isDark = currentTheme === 'dark';
+  const textColor = isDark ? '#e5e7eb' : '#374151';
+  const gridColor = isDark ? '#374151' : '#e5e7eb';
+
+  revenueChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Revenue',
+        data,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.4,
+        fill: true,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          labels: {
+            color: textColor,
+          },
+        },
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            color: textColor,
+            callback: function(value) {
+              return '$' + value.toLocaleString();
+            },
+          },
+          grid: {
+            color: gridColor,
+          },
+        },
+        x: {
+          ticks: {
+            color: textColor,
+          },
+          grid: {
+            color: gridColor,
+          },
+        },
+      },
+    },
+  });
+}
+
+function renderStatusChart(invoices: Invoice[]) {
+  const canvas = document.getElementById('status-chart') as HTMLCanvasElement;
+  if (!canvas) return;
+
+  // Destroy existing chart
+  if (statusChart) {
+    statusChart.destroy();
+  }
+
+  // Count by status
+  const statusCounts = {
+    draft: 0,
+    sent: 0,
+    paid: 0,
+    overdue: 0,
+    archived: 0,
+  };
+
+  invoices.forEach((invoice) => {
+    if (invoice.status in statusCounts) {
+      statusCounts[invoice.status as keyof typeof statusCounts]++;
+    }
+  });
+
+  const isDark = currentTheme === 'dark';
+  const textColor = isDark ? '#e5e7eb' : '#374151';
+
+  statusChart = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: ['Draft', 'Sent', 'Paid', 'Overdue', 'Archived'],
+      datasets: [{
+        data: [
+          statusCounts.draft,
+          statusCounts.sent,
+          statusCounts.paid,
+          statusCounts.overdue,
+          statusCounts.archived,
+        ],
+        backgroundColor: [
+          '#6b7280', // gray for draft
+          '#3b82f6', // blue for sent
+          '#10b981', // green for paid
+          '#ef4444', // red for overdue
+          '#9ca3af', // gray for archived
+        ],
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          labels: {
+            color: textColor,
+          },
+        },
+      },
+    },
+  });
+}
+
+function renderClientsChart(invoices: Invoice[]) {
+  const canvas = document.getElementById('clients-chart') as HTMLCanvasElement;
+  if (!canvas) return;
+
+  // Destroy existing chart
+  if (clientsChart) {
+    clientsChart.destroy();
+  }
+
+  // Group by client
+  const clientTotals = new Map<string, number>();
+
+  invoices.forEach((invoice) => {
+    const clientName = invoice.client.name || 'Unnamed';
+    const current = clientTotals.get(clientName) || 0;
+    clientTotals.set(clientName, current + invoice.totals.grandTotal);
+  });
+
+  // Get top 10 clients
+  const topClients = Array.from(clientTotals.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  const labels = topClients.map(([name]) => name);
+  const data = topClients.map(([, total]) => total);
+
+  const isDark = currentTheme === 'dark';
+  const textColor = isDark ? '#e5e7eb' : '#374151';
+  const gridColor = isDark ? '#374151' : '#e5e7eb';
+
+  clientsChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Revenue',
+        data,
+        backgroundColor: '#3b82f6',
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      indexAxis: 'y',
+      plugins: {
+        legend: {
+          display: false,
+        },
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: {
+            color: textColor,
+            callback: function(value) {
+              return '$' + value.toLocaleString();
+            },
+          },
+          grid: {
+            color: gridColor,
+          },
+        },
+        y: {
+          ticks: {
+            color: textColor,
+          },
+          grid: {
+            color: gridColor,
+          },
+        },
+      },
+    },
+  });
+}
+
+function renderAgingReport(invoices: Invoice[]) {
+  const container = document.getElementById('aging-report');
+  if (!container) return;
+
+  // Filter unpaid invoices
+  const unpaidInvoices = invoices.filter((inv) => inv.totals.balanceDue > 0);
+
+  if (unpaidInvoices.length === 0) {
+    container.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 py-8">No outstanding invoices</p>';
+    return;
+  }
+
+  // Calculate days overdue
+  const today = new Date();
+  const agingData = unpaidInvoices.map((invoice) => {
+    const dueDate = new Date(invoice.dueDate);
+    const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    let ageBucket = 'Current';
+    if (daysOverdue > 90) ageBucket = '90+ days';
+    else if (daysOverdue > 60) ageBucket = '61-90 days';
+    else if (daysOverdue > 30) ageBucket = '31-60 days';
+    else if (daysOverdue > 0) ageBucket = '1-30 days';
+
+    return {
+      invoice,
+      daysOverdue,
+      ageBucket,
+    };
+  });
+
+  // Sort by days overdue (descending)
+  agingData.sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+  const isDark = currentTheme === 'dark';
+  const tableClass = isDark ? 'dark' : '';
+
+  container.innerHTML = `
+    <table class="w-full text-sm ${tableClass}">
+      <thead class="bg-gray-50 dark:bg-gray-900">
+        <tr>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Invoice</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Client</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Due Date</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Age</th>
+          <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Balance Due</th>
+        </tr>
+      </thead>
+      <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+        ${agingData.map((item) => {
+          const overdueClass = item.daysOverdue > 0 ? 'text-red-600 dark:text-red-400 font-semibold' : '';
+          return `
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+              <td class="px-4 py-3 text-gray-900 dark:text-gray-100">${item.invoice.number}</td>
+              <td class="px-4 py-3 text-gray-900 dark:text-gray-100">${item.invoice.client.name}</td>
+              <td class="px-4 py-3 text-gray-900 dark:text-gray-100">${formatDate(item.invoice.dueDate)}</td>
+              <td class="px-4 py-3 ${overdueClass}">${item.ageBucket}</td>
+              <td class="px-4 py-3 text-right ${overdueClass}">${formatCurrency(item.invoice.totals.balanceDue, item.invoice.currency)}</td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+      <tfoot class="bg-gray-50 dark:bg-gray-900">
+        <tr>
+          <td colspan="4" class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">Total Outstanding:</td>
+          <td class="px-4 py-3 text-right font-bold text-red-600 dark:text-red-400">${formatCurrency(
+            agingData.reduce((sum, item) => sum + item.invoice.totals.balanceDue, 0),
+            'USD'
+          )}</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+
+// ========================================
 // Theme Toggle
 // ========================================
 
@@ -996,6 +1367,12 @@ async function toggleTheme() {
   }
   await saveSetting('theme', currentTheme);
   updateThemeToggleIcon();
+
+  // Re-render analytics charts if analytics view is active
+  const analyticsView = document.getElementById('analytics-view');
+  if (analyticsView?.classList.contains('active')) {
+    renderAnalytics();
+  }
 }
 
 function updateThemeToggleIcon() {

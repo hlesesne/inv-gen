@@ -297,6 +297,23 @@
     @apply text-2xl font-bold text-gray-900 dark:text-white;
   }
 
+  /* Analytics Dashboard */
+  .analytics-charts-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-6 mb-6;
+  }
+
+  .chart-card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6;
+  }
+
+  .chart-card-wide {
+    @apply md:col-span-2;
+  }
+
+  .chart-title {
+    @apply text-lg font-semibold text-gray-900 dark:text-white mb-4;
+  }
+
   /* Custom scrollbar */
   .custom-scrollbar::-webkit-scrollbar {
     width: 8px;
