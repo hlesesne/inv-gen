@@ -476,7 +476,7 @@ async function createNewInvoice() {
   currentInvoice = createBlankInvoice(sequence);
 
   // Load last used seller information
-  const savedSeller = await getSetting('lastSeller');
+  const savedSeller = await getSetting<Seller>('lastSeller');
   if (savedSeller) {
     currentInvoice.seller = savedSeller;
   }
